@@ -6,19 +6,25 @@ import json
 from tensorflow.keras.preprocessing import image
 from werkzeug.utils import secure_filename
 
-app = Flask(__name__)
+# Determine base paths relative to this script file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
 
-# -----------------------------
-# 1. Model & Config
-# -----------------------------
-MODEL_PATH = "../models/trained_model_multiclass.h5"
-CLASS_LABELS_PATH = "../models/class_labels.json"
-UPLOAD_FOLDER = "static/uploads"
+MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "trained_model_multiclass.h5")
+CLASS_LABELS_PATH = os.path.join(PROJECT_ROOT, "models", "class_labels.json")
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
 
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static")
+)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-print("[INFO] Loading multi-class model...")
+print(f"[INFO] Loading model from: {MODEL_PATH}")
 model = tf.keras.models.load_model(MODEL_PATH)
 
 # Load class labels from JSON (index -> display name)
@@ -44,21 +50,17 @@ for idx, name in sorted(class_names.items()):
     print(f"  [{idx}] {name}")
 
 # -----------------------------
-# 2. Helper
+# Helper Functions
 # -----------------------------
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# -----------------------------
-# 3. Predict Function - top-N
-# -----------------------------
 def predict_image(img_path, top_n=3):
     img = image.load_img(img_path, target_size=(150, 150))
     img_array = image.img_to_array(img) / 255.0
     img_array = np.expand_dims(img_array, axis=0)
     predictions = model.predict(img_array, verbose=0)[0]
 
-    # Get top-N indices sorted by confidence descending
     top_indices = np.argsort(predictions)[::-1][:top_n]
 
     results = []
@@ -76,7 +78,7 @@ def predict_image(img_path, top_n=3):
     return results
 
 # -----------------------------
-# 4. Routes
+# Routes
 # -----------------------------
 @app.route("/", methods=["GET"])
 def index():
@@ -121,5 +123,5 @@ def predict():
 
 
 if __name__ == "__main__":
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
