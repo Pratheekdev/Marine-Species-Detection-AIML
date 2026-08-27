@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Marine Species & Coral Detector</title>
+  <meta name="description" content="AI-powered marine species and coral reef classification. Upload an image to instantly identify fish species and coral types using deep learning." />
+
+  <!-- Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* =============================================
+       BASE & CSS TOKENS
+    ============================================= */
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --primary-light: #38bdf8;
+      --navy: #03045e;
+      --navy-light: #0077b6;
+      --bg-gradient-start: #e0f2fe;
+      --bg-gradient-end: #bae6fd;
+      --card-bg: rgba(255, 255, 255, 0.96);
+      --coral-badge-bg: #fff1f2;
+      --coral-badge-text: #e11d48;
+      --coral-badge-border: #fecdd3;
+      --fish-badge-bg: #f0fdf4;
+      --fish-badge-text: #16a34a;
+      --fish-badge-border: #bbf7d0;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 10px;
+      --shadow-sm: 0 4px 12px rgba(3, 4, 94, 0.06);
+      --shadow-md: 0 12px 32px rgba(3, 4, 94, 0.1);
+      --shadow-lg: 0 20px 48px rgba(3, 4, 94, 0.14);
+      --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at top right, #e0f2fe, #bae6fd, #93c5fd);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: var(--navy);
+      padding: 24px 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 520px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* =============================================
+       MAIN CARD
+    ============================================= */
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      padding: 36px 30px;
+      width: 100%;
+      text-align: center;
+      transition: var(--transition);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* =============================================
+       HEADER
+    ============================================= */
+    .header {
+      margin-bottom: 24px;
+    }
+
+    .badge-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: rgba(2, 132, 199, 0.1);
+      color: var(--primary-dark);
+      margin-bottom: 10px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      color: var(--navy);
+      font-size: 1.75rem;
+      font-weight: 700;
+      line-height: 1.3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .subtitle {
+      font-size: 0.92rem;
+      color: #64748b;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    /* =============================================
+       DROP ZONE / FILE UPLOAD
+    ============================================= */
+    .drop-zone {
+      border: 2px dashed #38bdf8;
+      border-radius: var(--radius-md);
+      padding: 32px 20px;
+      background: linear-gradient(180deg, #f8fafc 0%, #f0f9ff 100%);
+      cursor: pointer;
+      transition: var(--transition);
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      background: #e0f2fe;
+      border-color: var(--primary);
+      box-shadow: 0 0 20px rgba(2, 132, 199, 0.15);
+      transform: scale(1.01);
+    }
+
+    .drop-icon {
+      font-size: 2.2rem;
+      margin-bottom: 8px;
+      display: inline-block;
+      transition: transform 0.2s ease;
+    }
+
+    .drop-zone:hover .drop-icon {
+      transform: translateY(-3px);
+    }
+
+    .drop-zone-text {
+      font-size: 0.98rem;
+      font-weight: 600;
+      color: var(--primary-dark);
+    }
+
+    .drop-zone-subtext {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    /* =============================================
+       PREVIEW SECTION
+    ============================================= */
+    .preview-section {
+      display: none;
+      margin-bottom: 20px;
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+
+    .preview-section.visible {
+      display: block;
+    }
+
+    .image-container {
+      position: relative;
+      width: 100%;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      background: #0f172a;
+      aspect-ratio: 4 / 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .image-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .preview-overlay {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 4px 0;
+    }
+
+    .preview-filename {
+      font-size: 0.82rem;
+      color: #64748b;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 240px;
+    }
+
+    .change-btn {
+      background: none;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--primary-dark);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .change-btn:hover {
+      background: #f1f5f9;
+      border-color: var(--primary);
+    }
+
+    /* =============================================
+       ACTION BUTTON
+    ============================================= */
+    .detect-btn {
+      width: 100%;
+      padding: 14px 20px;
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: #fff;
+      font-size: 1.05rem;
+      font-weight: 700;
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(2, 132, 199, 0.35);
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .detect-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(2, 132, 199, 0.45);
+      background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+    }
+
+    .detect-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .spinner {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .detect-btn.loading .btn-text,
+    .detect-btn.loading .btn-icon {
+      display: none;
+    }
+
+    .detect-btn.loading .spinner {
+      display: block;
+    }
+
+    /* =============================================
+       RESULTS PANEL
+    ============================================= */
+    .results-panel {
+      display: none;
+      margin-top: 16px;
+      text-align: left;
+      animation: slideUp 0.35s ease-out forwards;
+    }
+
+    .results-panel.visible {
+      display: block;
+    }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .results-title-text {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--navy);
+    }
+
+    .prediction-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .prediction-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      transition: var(--transition);
+    }
+
+    .prediction-card.top-rank {
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border-color: #bae6fd;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .pred-row-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .pred-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pred-rank {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #94a3b8;
+      width: 20px;
+    }
+
+    .top-rank .pred-rank {
+      color: var(--primary);
+    }
+
+    .pred-name {
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: var(--navy);
+    }
+
+    .category-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border: 1px solid;
+    }
+
+    .category-coral {
+      background: var(--coral-badge-bg);
+      color: var(--coral-badge-text);
+      border-color: var(--coral-badge-border);
+    }
+
+    .category-fish {
+      background: var(--fish-badge-bg);
+      color: var(--fish-badge-text);
+      border-color: var(--fish-badge-border);
+    }
+
+    .pred-confidence {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--navy);
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #38bdf8 0%, #0284c7 100%);
+      border-radius: 9999px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* =============================================
+       ERROR PANEL
+    ============================================= */
+    .error-panel {
+      display: none;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      color: #991b1b;
+      font-size: 0.88rem;
+      margin-bottom: 16px;
+      align-items: center;
+      gap: 8px;
+      text-align: left;
+      animation: fadeIn 0.2s ease-out forwards;
+    }
+
+    .error-panel.visible {
+      display: flex;
+    }
+
+    /* =============================================
+       FOOTER
+    ============================================= */
+    .footer {
+      font-size: 0.8rem;
+      color: #64748b;
+      text-align: center;
+    }
+
+    /* =============================================
+       ANIMATIONS
+    ============================================= */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <main class="card" role="main">
+      <!-- Header -->
+      <div class="header">
+        <div class="badge-tag">AI Species Classifier</div>
+        <h1>🐠 Marine Species &amp; Coral Detector 🪸</h1>
+        <p class="subtitle">Upload an underwater image to identify marine organisms and coral formations</p>
+      </div>
+
+      <!-- Drop Zone -->
+      <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Upload marine image for classification">
+        <div class="drop-icon">📸</div>
+        <div class="drop-zone-text" id="drop-zone-text">Choose File or drag &amp; drop here</div>
+        <div class="drop-zone-subtext">Supports PNG, JPG, JPEG, WEBP</div>
+        <input type="file" id="file-input" accept="image/*" />
+      </div>
+
+      <!-- Image Preview -->
+      <div class="preview-section" id="preview-section">
+        <div class="image-container">
+          <img id="preview-img" src="" alt="Uploaded marine image preview" />
+        </div>
+        <div class="preview-overlay">
+          <span class="preview-filename" id="preview-filename"></span>
+          <button class="change-btn" id="change-btn" type="button">Change Image</button>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <button class="detect-btn" id="detect-btn" disabled type="button">
+        <span class="btn-icon">⚡</span>
+        <span class="btn-text">Classify Species</span>
+        <div class="spinner"></div>
+      </button>
+
+      <!-- Error Panel -->
+      <div class="error-panel" id="error-panel" role="alert">
+        <span>⚠️</span>
+        <span id="error-msg">Error message</span>
+      </div>
+
+      <!-- Results Panel -->
+      <section class="results-panel" id="results-panel" aria-live="polite">
+        <div class="results-header">
+          <span class="results-title-text">Top Predictions</span>
+        </div>
+        <div class="prediction-list" id="predictions-container"></div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      Powered by Deep Learning &amp; MobileNetV2
+    </footer>
+  </div>
+
+  <script>
+    const dropZone        = document.getElementById('drop-zone');
+    const fileInput       = document.getElementById('file-input');
+    const previewSection  = document.getElementById('preview-section');
+    const previewImg      = document.getElementById('preview-img');
+    const previewFilename = document.getElementById('preview-filename');
+    const changeBtn       = document.getElementById('change-btn');
+    const detectBtn       = document.getElementById('detect-btn');
+    const errorPanel      = document.getElementById('error-panel');
+    const errorMsg        = document.getElementById('error-msg');
+    const resultsPanel    = document.getElementById('results-panel');
+    const predContainer   = document.getElementById('predictions-container');
+    const dropZoneText    = document.getElementById('drop-zone-text');
+
+    let selectedFile = null;
+
+    // Handle selected file
+    function handleFile(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        showError('Please select a valid image file (PNG, JPG, JPEG, WEBP).');
+        return;
+      }
+      selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        previewImg.src = e.target.result;
+        previewFilename.textContent = file.name;
+        previewSection.classList.add('visible');
+        dropZone.style.display = 'none';
+        detectBtn.disabled = false;
+        hideError();
+        hideResults();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Dropzone triggers
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+        dropZoneText.textContent = "Drop image here...";
+      });
+    });
+
+    ['dragleave', 'dragend', 'drop'].forEach(evt => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        dropZoneText.textContent = "Choose File or drag & drop here";
+      });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      if (dt.files && dt.files[0]) handleFile(dt.files[0]);
+    });
+
+    dropZone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    // Reset UI back to upload state
+    changeBtn.addEventListener('click', () => {
+      selectedFile = null;
+      previewSection.classList.remove('visible');
+      dropZone.style.display = 'block';
+      detectBtn.disabled = true;
+      fileInput.value = '';
+      hideError();
+      hideResults();
+    });
+
+    // Form submission via AJAX
+    detectBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+
+      detectBtn.classList.add('loading');
+      detectBtn.disabled = true;
+      hideError();
+      hideResults();
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      try {
+        const resp = await fetch('/predict', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok || data.error) {
+          showError(data.error || 'Prediction failed. Please try again.');
+          return;
+        }
+
+        renderResults(data.predictions);
+      } catch (err) {
+        showError('Network error. Please make sure the Flask server is running.');
+      } finally {
+        detectBtn.classList.remove('loading');
+        detectBtn.disabled = false;
+      }
+    });
+
+    // Render prediction list
+    function renderResults(predictions) {
+      predContainer.innerHTML = '';
+
+      predictions.forEach((pred, index) => {
+        const item = document.createElement('div');
+        const isTop = index === 0;
+        item.className = `prediction-card ${isTop ? 'top-rank' : ''}`;
+
+        const catClass = pred.category === 'coral' ? 'category-coral' : 'category-fish';
+        const catIcon = pred.category === 'coral' ? '🪸' : '🐠';
+        const catLabel = pred.category === 'coral' ? 'Coral' : 'Fish';
+
+        item.innerHTML = `
+          <div class="pred-row-main">
+            <div class="pred-left">
+              <span class="pred-rank">#${index + 1}</span>
+              <span class="pred-name">${pred.label}</span>
+              <span class="category-badge ${catClass}">${catIcon} ${catLabel}</span>
+            </div>
+            <div class="pred-confidence">${pred.confidence}%</div>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" style="width: ${pred.confidence}%"></div>
+          </div>
+        `;
+
+        predContainer.appendChild(item);
+      });
+
+      resultsPanel.classList.add('visible');
+
+      setTimeout(() => {
+        resultsPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+    }
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorPanel.classList.add('visible');
+    }
+
+    function hideError() {
+      errorPanel.classList.remove('visible');
+    }
+
+    function hideResults() {
+      resultsPanel.classList.remove('visible');
+      predContainer.innerHTML = '';
+    }
+  </script>
+</body>
+</html>

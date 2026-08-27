@@ -1,0 +1,31 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# Uploads & Scratch (Exclude contents but keep folder)
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+scratch/*
+!scratch/.gitkeep
+
+# Large Datasets (~9.5GB total, excluded from Git)
+dataset/*
+!dataset/.gitkeep
+dataset_flat/*
+!dataset_flat/.gitkeep
+
+# IDEs & System files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
