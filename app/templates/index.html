@@ -612,7 +612,36 @@
       hideResults();
     });
 
-    // Form submission via AJAX
+    // Form submission via AJAX with auto-retry on first failure
+    async function doClassify(formData, isRetry = false) {
+      try {
+        const resp = await fetch('/predict', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok || data.error) {
+          showError(data.error || 'Prediction failed. Please try again.');
+          return false;
+        }
+
+        renderResults(data.predictions);
+        return true;
+      } catch (err) {
+        if (!isRetry) {
+          // First attempt failed — server may be cold-starting. Auto-retry after 8s.
+          showError('Server is warming up (model loading…). Retrying in 8 seconds…');
+          await new Promise(r => setTimeout(r, 8000));
+          hideError();
+          return doClassify(formData, true);
+        }
+        showError('Classification failed. The server may still be starting up — please wait 30 seconds and try again.');
+        return false;
+      }
+    }
+
     detectBtn.addEventListener('click', async () => {
       if (!selectedFile) return;
 
@@ -624,26 +653,10 @@
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      try {
-        const resp = await fetch('/predict', {
-          method: 'POST',
-          body: formData
-        });
+      await doClassify(formData);
 
-        const data = await resp.json();
-
-        if (!resp.ok || data.error) {
-          showError(data.error || 'Prediction failed. Please try again.');
-          return;
-        }
-
-        renderResults(data.predictions);
-      } catch (err) {
-        showError('Network error. Please make sure the Flask server is running.');
-      } finally {
-        detectBtn.classList.remove('loading');
-        detectBtn.disabled = false;
-      }
+      detectBtn.classList.remove('loading');
+      detectBtn.disabled = false;
     });
 
     // Render prediction list

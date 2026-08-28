@@ -1,9 +1,7 @@
 from flask import Flask, render_template, request, jsonify
-import tensorflow as tf
 import numpy as np
 import os
 import json
-from tensorflow.keras.preprocessing import image
 from werkzeug.utils import secure_filename
 
 # Determine base paths relative to this script file
@@ -24,30 +22,49 @@ app = Flask(
 )
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-print(f"[INFO] Loading model from: {MODEL_PATH}")
-model = tf.keras.models.load_model(MODEL_PATH)
+# -----------------------------------------------
+# Lazy-load model & labels (avoids gunicorn startup
+# timeout on Render's free tier — model loads on
+# first /predict request instead of at import time)
+# -----------------------------------------------
+_model = None
+_class_names = None
 
-# Load class labels from JSON (index -> display name)
-with open(CLASS_LABELS_PATH, 'r', encoding="utf-8") as f:
-    raw_labels = json.load(f)
 
-# Build display-friendly names: "Boulder_Coral" -> "Boulder Coral"
-class_names = {}
-for idx_str, raw_name in raw_labels.items():
-    display = raw_name.replace("_", " ").title()
-    class_names[int(idx_str)] = display
+def get_model():
+    """Load the Keras model on first request (lazy loading)."""
+    global _model
+    if _model is None:
+        import tensorflow as tf
+        print(f"[INFO] Loading model from: {MODEL_PATH}", flush=True)
+        _model = tf.keras.models.load_model(MODEL_PATH)
+        print("[OK] Model loaded successfully.", flush=True)
+    return _model
+
+
+def get_class_names():
+    """Load class label mapping on first request (lazy loading)."""
+    global _class_names
+    if _class_names is None:
+        with open(CLASS_LABELS_PATH, 'r', encoding="utf-8") as f:
+            raw_labels = json.load(f)
+        _class_names = {}
+        for idx_str, raw_name in raw_labels.items():
+            display = raw_name.replace("_", " ").title()
+            _class_names[int(idx_str)] = display
+        print(f"[OK] Loaded {len(_class_names)} classes.", flush=True)
+    return _class_names
+
 
 # Map class to category (Fish or Coral)
 CORAL_CLASSES = {"Boulder Coral", "Branched Coral", "Plate Coral", "Soft Coral"}
+
 
 def get_category(label):
     if label in CORAL_CLASSES:
         return "coral"
     return "fish"
 
-print(f"[OK] Loaded {len(class_names)} classes:")
-for idx, name in sorted(class_names.items()):
-    print(f"  [{idx}] {name}")
 
 # -----------------------------
 # Helper Functions
@@ -55,9 +72,15 @@ for idx, name in sorted(class_names.items()):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
 def predict_image(img_path, top_n=3):
-    img = image.load_img(img_path, target_size=(150, 150))
-    img_array = image.img_to_array(img) / 255.0
+    from tensorflow.keras.preprocessing import image as keras_image
+
+    model = get_model()
+    class_names = get_class_names()
+
+    img = keras_image.load_img(img_path, target_size=(150, 150))
+    img_array = keras_image.img_to_array(img) / 255.0
     img_array = np.expand_dims(img_array, axis=0)
     predictions = model.predict(img_array, verbose=0)[0]
 
@@ -77,6 +100,7 @@ def predict_image(img_path, top_n=3):
 
     return results
 
+
 # -----------------------------
 # Routes
 # -----------------------------
@@ -89,9 +113,20 @@ def index():
 def health():
     return jsonify({
         "status": "online",
-        "model_loaded": True,
-        "classes_count": len(class_names)
+        "model_loaded": _model is not None,
+        "classes_count": len(_class_names) if _class_names else 0
     })
+
+
+@app.route("/warmup", methods=["GET"])
+def warmup():
+    """Pre-load model after deploy — visit this URL once to avoid cold-start on first classify."""
+    try:
+        get_model()
+        get_class_names()
+        return jsonify({"status": "warmed up", "classes": len(_class_names)})
+    except Exception as e:
+        return jsonify({"status": "error", "detail": str(e)}), 500
 
 
 @app.route("/predict", methods=["POST"])
@@ -113,6 +148,7 @@ def predict():
     try:
         results = predict_image(filepath, top_n=3)
     except Exception as e:
+        print(f"[ERROR] Prediction failed: {e}", flush=True)
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
     image_url = f"/static/uploads/{filename}"
